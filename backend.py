@@ -117,7 +117,6 @@ For general chat:
     }}
 }}
 """
-
     response = openai.ChatCompletion.create(
         model=OpenAI_model,
         messages=[
@@ -161,7 +160,7 @@ Respond with just the category name, nothing else.
 
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model=OpenAI_model,
             messages=[
                 {
                     "role": "system",
@@ -210,7 +209,7 @@ secondary: [secondary_subcategory or "none"]
 
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model=OpenAI_model,
             messages=[
                 {
                     "role": "system",
