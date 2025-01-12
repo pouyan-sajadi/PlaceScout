@@ -1,6 +1,9 @@
 # PlaceScout
 
-Welcome to PlaceScout, an intelligent application designed to help discover places and get directions using natural language processing. This project leverages the power of OpenAI's language models and Google Maps API to provide a seamless experience for finding and navigating to places.
+Welcome to PlaceScout, an intelligent application crafted to enhance the discovery of places and navigation using advanced natural language processing. This project harnesses the capabilities of OpenAI's language models and the Google Maps API to deliver a seamless and intuitive experience for users seeking to explore and navigate the world around them.
+
+## Project Overview
+PlaceScout is a testament to the integration of machine learning engineering, data science, and software development. It showcases the application of cutting-edge technologies in natural language processing, API integration, and user interface design to solve real-world problems.
 
 ## Features
 
@@ -14,16 +17,17 @@ Welcome to PlaceScout, an intelligent application designed to help discover plac
 1. Clone the repository
 2. Install dependencies: `pip install -r requirements.txt`
 3. Create a `.env` file with your API keys:
+4. 
 OPENAI_API_KEY=your_openai_key
 
 GOOGLE_MAPS_API_KEY=your_google_maps_key
 
-OpenAI_model=gpt-4-mini (or any other OpenAI model)
+OpenAI_model=gpt-4o-mini (or any other OpenAI model)
 
-5. Run the app: `streamlit run interfave.py`
+5. Run the app: `streamlit run interface.py`
 
 ## Usage
-- Find Places: Type queries like "Find coffee shops in New York" to get a list of places with detailed information.
+- Find Places: Type queries like "Find coffee shops near Stanley Park, Vancouver" to get a list of places with detailed information.
 - Get Directions: Use queries like "Directions from Central Park to Times Square" to receive step-by-step navigation.
 - Explore Recent Places: Access your recent searches from the sidebar for quick reference.
 
