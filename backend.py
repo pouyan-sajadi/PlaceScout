@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-import openai
+from openai import OpenAI
 import googlemaps
 import json
 from datetime import datetime
@@ -8,44 +8,28 @@ import re
 from categories import PLACE_CATEGORIES
 import streamlit as st
 
-# Load environment variables
+# Load environment variables for local development
 load_dotenv()
 
-# Initialize API keys
-if 'OPENAI_API_KEY' in st.secrets:
-    # Streamlit Cloud - use secrets
-    OPENAI_API_KEY = st.secrets['OPENAI_API_KEY']
-    GOOGLE_MAPS_API_KEY = st.secrets['GOOGLE_MAPS_API_KEY']
-    OpenAI_model = st.secrets['OpenAI_model']
-else:
-    # Local development - use .env file
+# Initialize API keys - prioritize Streamlit secrets over environment variables
+try:
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+    GOOGLE_MAPS_API_KEY = st.secrets["GOOGLE_MAPS_API_KEY"]
+except Exception:
+    # Fallback to environment variables for local development
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
     GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
-    OpenAI_model = os.getenv('OpenAI_model')
 
 # Initialize clients with error handling
 try:
-    # Initialize OpenAI
-    openai.api_key = OPENAI_API_KEY
-    
-    # Initialize Google Maps client
-    if not GOOGLE_MAPS_API_KEY:
-        raise ValueError("Google Maps API key is not set")
+    client = OpenAI(api_key=OPENAI_API_KEY)
     gmaps = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
-    
 except Exception as e:
     st.error(f"Error initializing API clients: {str(e)}")
-    st.error("Please ensure all API keys are properly configured")
-    gmaps = None  # Set to None so we can check for it later
-
-# Add a function to check if APIs are properly initialized
-def check_api_keys():
-    if not OPENAI_API_KEY or not GOOGLE_MAPS_API_KEY:
-        st.error("API keys not properly configured")
-        return False
-    return True
+    st.error("Please ensure API keys are properly configured in Streamlit secrets or environment variables.")
 
 # Global variables
+OpenAI_model = "gpt-4o-mini"
 conversation_history = []
 place_address_map = {}  # Store place names and their formatted addresses
 
@@ -117,7 +101,8 @@ For general chat:
     }}
 }}
 """
-    response = openai.ChatCompletion.create(
+
+    response = client.chat.completions.create(
         model=OpenAI_model,
         messages=[
             {
@@ -159,8 +144,8 @@ Respond with just the category name, nothing else.
 """
 
     try:
-        response = openai.ChatCompletion.create(
-            model=OpenAI_model,
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "system",
@@ -208,8 +193,8 @@ secondary: [secondary_subcategory or "none"]
 """
 
     try:
-        response = openai.ChatCompletion.create(
-            model=OpenAI_model,
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
             messages=[
                 {
                     "role": "system",
@@ -344,7 +329,7 @@ def summarize_reviews(reviews):
 
     reviews_text = "\n".join([review['text'] for review in reviews[:5]])
     
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model=OpenAI_model,
         messages=[
             {"role": "system", "content": "Summarize the key points from these reviews concisely:"},
@@ -464,7 +449,7 @@ IMPORTANT:
 """
 
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model=OpenAI_model,
             messages=[
                 {
@@ -544,7 +529,7 @@ def handle_general_query(query, conversation_history):
     messages.append({"role": "user", "content": query})
 
     # Get response from OpenAI
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model=OpenAI_model,
         messages=messages,
         max_tokens=150,

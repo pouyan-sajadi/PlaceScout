@@ -1,5 +1,5 @@
 streamlit
 python-dotenv
-openai==0.27.8
+openai
 googlemaps
 pandas

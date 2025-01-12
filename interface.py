@@ -1,5 +1,5 @@
 import streamlit as st
-from backend import parse_prompt, find_places, get_directions, handle_general_query, summarize_places, calculate_remaining_open_time, check_api_keys
+from backend import parse_prompt, find_places, get_directions, handle_general_query, summarize_places, calculate_remaining_open_time
 import json
 import re
 
@@ -59,8 +59,6 @@ def main():
         layout="wide"
     )
 
-    if not check_api_keys():
-        st.stop()
     # Initialize session state
     initialize_session_state()
 
