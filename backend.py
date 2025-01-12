@@ -6,17 +6,44 @@ import json
 from datetime import datetime
 import re
 from categories import PLACE_CATEGORIES
+import streamlit as st
+
 # Load environment variables
 load_dotenv()
 
-# Configure API keys
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
-OpenAI_model = os.getenv('OpenAI_model')
+# Initialize API keys
+if 'OPENAI_API_KEY' in st.secrets:
+    # Streamlit Cloud - use secrets
+    OPENAI_API_KEY = st.secrets['OPENAI_API_KEY']
+    GOOGLE_MAPS_API_KEY = st.secrets['GOOGLE_MAPS_API_KEY']
+    OpenAI_model = st.secrets['OpenAI_model']
+else:
+    # Local development - use .env file
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+    GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
+    OpenAI_model = os.getenv('OpenAI_model')
 
-# Initialize clients
-openai.api_key = OPENAI_API_KEY
-gmaps = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
+# Initialize clients with error handling
+try:
+    # Initialize OpenAI
+    openai.api_key = OPENAI_API_KEY
+    
+    # Initialize Google Maps client
+    if not GOOGLE_MAPS_API_KEY:
+        raise ValueError("Google Maps API key is not set")
+    gmaps = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
+    
+except Exception as e:
+    st.error(f"Error initializing API clients: {str(e)}")
+    st.error("Please ensure all API keys are properly configured")
+    gmaps = None  # Set to None so we can check for it later
+
+# Add a function to check if APIs are properly initialized
+def check_api_keys():
+    if not OPENAI_API_KEY or not GOOGLE_MAPS_API_KEY:
+        st.error("API keys not properly configured")
+        return False
+    return True
 
 # Global variables
 conversation_history = []

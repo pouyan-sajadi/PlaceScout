@@ -1,5 +1,5 @@
 import streamlit as st
-from backend import parse_prompt, find_places, get_directions, handle_general_query, summarize_places, calculate_remaining_open_time
+from backend import parse_prompt, find_places, get_directions, handle_general_query, summarize_places, calculate_remaining_open_time, check_api_keys
 import json
 import re
 
@@ -52,12 +52,15 @@ def display_message(role, content):
         st.markdown(content)
 
 def main():
+    
     st.set_page_config(
         page_title="AI Place Finder",
         page_icon="🗺️",
         layout="wide"
     )
 
+    if not check_api_keys():
+        st.stop()
     # Initialize session state
     initialize_session_state()
 
