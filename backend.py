@@ -13,13 +13,12 @@ load_dotenv()
 
 # Initialize API keys - prioritize Streamlit secrets over environment variables
 try:
-    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
     GOOGLE_MAPS_API_KEY = st.secrets["GOOGLE_MAPS_API_KEY"]
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 except Exception:
     # Fallback to environment variables for local development
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
     GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
-
 # Initialize clients with error handling
 try:
     client = OpenAI(api_key=OPENAI_API_KEY)
