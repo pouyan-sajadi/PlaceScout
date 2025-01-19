@@ -5,7 +5,7 @@ import googlemaps
 import json
 from datetime import datetime
 import re
-from categories import PLACE_CATEGORIES
+from categories import PLACE_CATEGORIES, CATEGORY_DESCRIPTIONS
 import streamlit as st
 
 # Load environment variables for local development
@@ -30,9 +30,8 @@ except Exception as e:
 # Global variables
 OpenAI_model = "gpt-4o-mini"
 conversation_history = []
-place_address_map = {}  # Store place names and their formatted addresses
 
-def parse_prompt(user_input, conversation_history=[]):
+def parse_prompt(user_input, place_address_map, conversation_history=[]):
     """
     Uses OpenAI's API to parse the user's prompt and extract the required action and parameters.
     Includes conversation context for better understanding but focuses on parsing the last input.
@@ -42,29 +41,41 @@ def parse_prompt(user_input, conversation_history=[]):
         f"{'User' if msg['role'] == 'user' else 'Assistant'}: {msg['content']}"
         for msg in conversation_history[-5:]  # Get last 5 messages for context
     ])
-
+    # Convert address dictionary to formatted string
+    address_list = "\n".join([f"{name}: {addr}" for name, addr in place_address_map.items()])
+    
     system_message = f"""
 You are a helpful assistant that can:
 
 1. Find places ('find_places' action):
    - Help users find places of a specific type near a location based their last message
    - Do NOT include additional place types unless specifically requested
-   - Requires parameters: "location" and "place_type". 
+   - Choose appropriate search radius based on place type:
+     * 1500m: For frequent, common places (restaurants, cafes, convenience stores, ATMs)
+     * 3000m: For regular services (supermarkets, gyms, pharmacies, schools)
+     * 5000m: For less frequent services (hospitals, shopping malls, specialized stores)
+     * 10000m: For rare or destination places (airports, specialized medical facilities)
+   - Consider factors like:
+     * How common/frequent the place type is
+     * How far people typically travel for this service
+     * Urgency/importance of the service
+   - Requires parameters: "location", "place_type", and "radius"
 
 2. Get directions ('get_directions' action):
    - Provide directions from one location to another
-   - When users refer to previously mentioned places, find and use their full addresses in the places list in the chat history
-   - If destination matches any recently mentioned place names, use their full address found in the place's list the chat history
+   - Check the following address dictionary for any mentioned places and find the:
 
+Known Places and Addresses:
+{address_list}
+
+   - If a mentioned place matches any in the dictionary, use its full address
+   - If no match is found, use the location as provided
+   - Always include complete addresses in the response
 
 3. Answer general queries ('chat' action):
    - If the user's input doesn't match the above actions, respond as a knowledgeable assistant
    - This should be your default mode.
    - For these queries, set action as "chat" and include the user's query in parameters as "query"
-
-Below is the recent conversation context, followed by the latest user message that needs to be parsed.
-While you can use the context to better understand the user's intent, please parse ONLY the last message
-to determine the action and parameters.
 
 Recent Conversation:
 {conversation_text}
@@ -86,8 +97,8 @@ For getting directions:
 {{
     "action": "get_directions",
     "parameters": {{
-        "origin": "starting point (should be a full address found on chat history)",
-        "destination": "ending point (should be a full address found on chat history)",
+        "origin": "full address (from dictionary if place is mentioned)",
+        "destination": "full address (from dictionary if place is mentioned)",
         "mode": "driving|walking|bicycling|transit (optional)"
     }}
 }}
@@ -99,8 +110,19 @@ For general chat:
         "query": "original user query"
     }}
 }}
-"""
 
+Example:
+If user says "How do I get to pizza hut" and "pizza hut: 123 Main St, Vancouver" is in the address dictionary,
+return:
+{{
+    "action": "get_directions",
+    "parameters": {{
+        "destination": "123 Main St, Vancouver",
+        "origin": null,
+        "mode": "driving"
+    }}
+}}
+"""
     response = client.chat.completions.create(
         model=OpenAI_model,
         messages=[
@@ -124,15 +146,14 @@ def identify_primary_category(user_input, conversation_history=[]):
     Use LLM to identify the primary category from user input.
     Returns the most appropriate category from PLACE_CATEGORIES keys.
     """
-    categories_list = list(PLACE_CATEGORIES.keys())
-    
+    # Create a formatted string for each category and its description
+    categories_with_descriptions = "\n".join([f"{category}: {description}" for category, description in CATEGORY_DESCRIPTIONS.items()])
     prompt = f"""
-Given a user's request, identify the most appropriate primary category from the following list:
-{', '.join(categories_list)}
+Given a user's request, identify the most appropriate primary category from the following list, check the explanation for the categories and chose the most relevant:
 
 User's input: "{user_input}"
-Recent conversation context:
-{chr(10).join([f"{msg['role']}: {msg['content']}" for msg in conversation_history[-3:]])}
+
+{categories_with_descriptions}
 
 Rules:
 1. Choose ONLY ONE category from the provided list
@@ -144,7 +165,7 @@ Respond with just the category name, nothing else.
 
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=OpenAI_model,
             messages=[
                 {
                     "role": "system",
@@ -155,7 +176,6 @@ Respond with just the category name, nothing else.
             temperature=0.0,
             max_tokens=50
         )
-
         category = response.choices[0].message.content.strip().lower()
         return category 
     
@@ -193,7 +213,7 @@ secondary: [secondary_subcategory or "none"]
 
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=OpenAI_model,
             messages=[
                 {
                     "role": "system",
@@ -226,7 +246,7 @@ def clean_json_response(response_text):
     cleaned = response_text.replace('```json', '').replace('```', '').strip()
     return cleaned
 
-def find_places(location, user_input, conversation_history=[]):
+def find_places(location, user_input, radius=1500, conversation_history=[]):
     """
     Find places based on user input, using category identification and Google Maps API.
     
@@ -240,12 +260,11 @@ def find_places(location, user_input, conversation_history=[]):
     """
     # First, identify the primary category
     primary_category = identify_primary_category(user_input, conversation_history)
-    
     # Then, identify the subcategory
     primary_sub, secondary_sub = identify_subcategory(
         primary_category, user_input, conversation_history
     )
-    
+   
     # Geocode the location
     geocode_result = gmaps.geocode(location)
     if not geocode_result:
@@ -256,7 +275,7 @@ def find_places(location, user_input, conversation_history=[]):
     # Search for places using both type and keyword
     places_result = gmaps.places_nearby(
         location=(latlng['lat'], latlng['lng']),
-        radius=1500,
+        radius=radius,
         type=primary_category,
         keyword=primary_sub if primary_sub != "general" else None
     )
@@ -265,7 +284,7 @@ def find_places(location, user_input, conversation_history=[]):
     if not places_result.get('results') and secondary_sub:
         places_result = gmaps.places_nearby(
             location=(latlng['lat'], latlng['lng']),
-            radius=1500,
+            radius=radius,
             type=primary_category,
             keyword=secondary_sub
         )
@@ -274,7 +293,7 @@ def find_places(location, user_input, conversation_history=[]):
     if not places_result.get('results'):
         places_result = gmaps.places_nearby(
             location=(latlng['lat'], latlng['lng']),
-            radius=1500,
+            radius=radius,
             type=primary_category
         )
 
@@ -283,7 +302,7 @@ def find_places(location, user_input, conversation_history=[]):
 
     # Get detailed information for each place
     detailed_places = []
-    for place in places_result['results'][:5]:  # Limit to top 5 places
+    for place in places_result['results'][:6]:  # Limit to top 6 places
         try:
             place_details = gmaps.place(
                 place['place_id'],
@@ -444,7 +463,8 @@ IMPORTANT:
 1. Do NOT include markdown formatting (no ```json or ```)
 2. Respond ONLY with the JSON object
 3. Ensure valid JSON structure
-4. Include all places in the response
+4. Include at most 4 most relevant {place_type} places in the response
+5. If none are related just in over summary write you couldn't find anythin relevant
 """
 
     try:
@@ -543,6 +563,8 @@ def handle_general_query(query, conversation_history):
 def main():
     # Move conversation_history to global scope or use st.session_state if using Streamlit
     global conversation_history
+    place_address_map = {}  # Store place names and their formatted addresses
+
     if 'conversation_history' not in globals():
         conversation_history = []
 
@@ -566,7 +588,7 @@ Try asking me to find something near a location!
         conversation_history.append({"role": "user", "content": user_input})
 
         # Parse input
-        parsed_input = parse_prompt(user_input, conversation_history)
+        parsed_input = parse_prompt(user_input, place_address_map, conversation_history)
         if not parsed_input:
             handle_general_query(user_input, conversation_history)
             continue
@@ -580,12 +602,12 @@ Try asking me to find something near a location!
                 place_type = parameters.get('place_type', 'restaurant')
                 
                 if location == "None":
-                    print("Please provide a location.")
+                    #print("Please provide a location.")
                     continue
 
                 places = find_places(location, place_type)
                 if not places:
-                    print(f"No {place_type}s found near {location}.")
+                    #print(f"No {place_type}s found near {location}.")
                     continue
 
                 # Store addresses

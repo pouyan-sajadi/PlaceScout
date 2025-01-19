@@ -145,3 +145,42 @@ PLACE_CATEGORIES = {
         "transit_station", "truck_stop"
     ]
 }
+CATEGORY_DESCRIPTIONS = {
+    "automotive": "This category includes places related to vehicles and transportation services, such as car dealerships and gas stations. Examples: car_dealer, gas_station.",
+    
+    "business": "This category encompasses various business-related locations, including corporate offices and farms. Examples: corporate_office, farm.",
+    
+    "culture": "This category covers places of cultural significance, such as museums and art galleries. Examples: museum, art_gallery.",
+    
+    "education": "This category includes educational institutions and facilities, such as schools and universities. Examples: school, university.",
+    
+    "entertainment and recreation": "This category features places for leisure and entertainment, including amusement parks and theaters. Examples: amusement_park, movie_theater.",
+    
+    "facilities": "This category includes public facilities and amenities, such as public bathrooms and stables. Examples: public_bathroom, stable.",
+    
+    "finance": "This category covers financial institutions and services, such as banks and ATMs. Examples: bank, atm.",
+    
+    "food and drink": "This category includes places where food and beverages are served or sold, such as restaurants and cafes. Examples: restaurant, cafe.",
+    
+    "geographical areas": "This category refers to specific geographical and administrative regions, such as countries and localities. Examples: country, locality.",
+    
+    "government": "This category includes government buildings and offices, such as city halls and post offices. Examples: city_hall, post_office.",
+    
+    "health and wellness": "This category encompasses places related to health services and wellness, such as hospitals and spas. Examples: hospital, spa.",
+    
+    "housing": "This category includes residential buildings and complexes, such as apartments and condominiums. Examples: apartment_building, condominium_complex.",
+    
+    "lodging": "This category covers accommodations for travelers, such as hotels and hostels. Examples: hotel, hostel.",
+    
+    "natural features": "This category includes natural landmarks and features, such as beaches. Example: beach.",
+    
+    "places of worship": "This category includes religious buildings and places of worship, such as churches and mosques. Examples: church, mosque.",
+    
+    "services": "This category encompasses various service providers, such as beauty salons and real estate agencies. Examples: beauty_salon, real_estate_agency.",
+    
+    "shopping": "This category includes retail locations where goods are sold, such as grocery stores and shopping malls. Examples: grocery_store, shopping_mall.",
+    
+    "sports": "This category covers places related to sports and physical activities, such as gyms and stadiums. Examples: gym, stadium.",
+    
+    "transportation": "This category includes transportation hubs and facilities, such as airports and train stations. Examples: airport, train_station."
+}

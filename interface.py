@@ -73,13 +73,13 @@ def main():
         )
 
     # Chat input
-    if prompt := st.chat_input("What would you like to know?"):
+    if prompt := st.chat_input("Where would you like to go?"):
         # Display user message
         display_message("user", prompt)
         st.session_state.conversation.append({"role": "user", "content": prompt})
 
         # Parse user input
-        parsed_input = parse_prompt(prompt, st.session_state.conversation)
+        parsed_input = parse_prompt(prompt, st.session_state.place_address_map, st.session_state.conversation)
         
         try:
             if parsed_input:
@@ -89,16 +89,16 @@ def main():
                 if action == 'find_places':
                     location = parameters.get('location')
                     place_type = parameters.get('place_type', 'restaurant')
+                    full_response = "" 
+                    response = ""
 
                     if location == "None":
                         response = "Please provide a location."
-                        display_message("assistant", response)
                         st.session_state.conversation.append({"role": "assistant", "content": response})
                     else:
-                        places = find_places(location, place_type)
+                        places = find_places(location, place_type, radius=parameters.get('radius', 1500))
                         if not places:
                             response = f"No {place_type}s found near {location}."
-                            display_message("assistant", response)
                             st.session_state.conversation.append({"role": "assistant", "content": response})
                         else:
                             # Get summarized response
@@ -107,18 +107,31 @@ def main():
                             # Store places and their addresses in session state
                             for place in summary['places']:
                                 place_name = place['place_name'].lower()
-                                if 'address' in place:  # Store address if available
+                                if 'address' in place:
                                     st.session_state.place_address_map[place_name] = place['address']
                             
-                            # Display results in chat
+                            # Display all results in a single chat message
                             with st.chat_message("assistant"):
-                                st.markdown(f"### 📍 Found places near {location}\n")
+                                # Display header
+                                header = f"### 📍 Found {place_type}s near {location}\n"                       
+                                st.markdown(header)
+                                full_response = header
                                 
+                                # Process each place
                                 for place, p in zip(places, summary['places']):
-                                    st.markdown(f"## 🏢 {place['name']}")
-                                    
-                                    details = f"""
-📍 **Address:** {place.get('formatted_address', 'Address not available')}
+                                    place_name = place['name'].lower()
+
+                                    # Store in address dictionary and history
+                                    if place.get('formatted_address'):
+                                        st.session_state.places_history[place_name] = {
+                                            'address': place.get('formatted_address'),
+                                            'rating': place.get('rating', 'No rating'),
+                                            'total_ratings': place.get('user_ratings_total', '0'),
+                                        }
+
+                                    # Create and display place details
+                                    place_details = f"""## 🏢 {place['name']}\n\n"""
+                                    place_details += f"""📍 **Address:** {place.get('formatted_address', 'Address not available')}
 
 ⭐ **Rating:** {place.get('rating', 'No rating')} ({place.get('user_ratings_total', 0)} reviews)
 
@@ -129,38 +142,33 @@ def main():
 🎯 **Our Take:** {p['assistant_take']}
 
 👥 **Summary of Recent Reviews:** {p['review_summary']}
+
 """
-                                    st.markdown(details)
+                                    st.markdown(place_details)
                                     
-                                    # Display photo
+                                    # Display photo if available
                                     try:
-                                        photo_reference = place['photos'][0]['photo_reference']
-                                        photo_bytes = get_place_photo(photo_reference)
-                                        if photo_bytes:
-                                            st.image(photo_bytes, width=400)
+                                        if 'photos' in place and place['photos']:
+                                            photo_reference = place['photos'][0]['photo_reference']
+                                            photo_bytes = get_place_photo(photo_reference)
+                                            if photo_bytes:
+                                                st.image(photo_bytes, width=400)
                                     except Exception as e:
-                                        with st.sidebar:
-                                            st.error(f"Photo error: {str(e)}")
+                                        st.error(f"Couldn't load photo for {place['name']}")
                                     
                                     st.markdown("---")
+                                    full_response += place_details + "---\n\n"
                                 
-                                st.markdown(f"**Overall Summary:**\n{summary['overall_summary']}")
+                                # Display overall summary
+                                overall_summary = f"\n**Overall Summary:**\n{summary['overall_summary']}"
+                                st.markdown(overall_summary)
+                                full_response += overall_summary
 
-                            # Store places with more details
-                            for place in places:
-                                place_name = place['name'].lower()
-                                st.session_state.places_history[place_name] = {
-                                    'address': place.get('formatted_address'),
-                                    'rating': place.get('rating', 'No rating'),
-                                    'total_ratings': place.get('user_ratings_total', '0'),
-                                }
-                                # Also store in address map for directions functionality
-                                st.session_state.place_address_map[place_name] = place.get('formatted_address')
-
-                            # Store a simplified version in conversation history
-                            response = f"Found places near {location}. See details above."
-                            st.session_state.conversation.append({"role": "assistant", "content": response})
-
+                            # Store the full response in conversation history
+                            st.session_state.conversation.append({
+                                "role": "assistant",
+                                "content": full_response
+                            })
                 elif action == 'get_directions':
                     destination = parameters.get('destination', '').lower()
                     origin = parameters.get('origin')
@@ -179,9 +187,17 @@ def main():
                                     st.write("Using stored address:", destination)
 
                             directions = get_directions(origin, destination, mode)
-                            
+
                             if directions and isinstance(directions, dict):
-                                response = f"### 🚗 Directions from {origin} to {destination}\n\n"
+                                # Choose emoji based on transport mode
+                                mode_emoji = {
+                                    'driving': '🚗',
+                                    'walking': '🚶',
+                                    'bicycling': '🚲',
+                                    'transit': '🚌'
+                                }.get(mode, '🚗')  # Default to car emoji if mode not found
+                                
+                                response = f"### {mode_emoji} {mode.title()} Directions from {origin} to {destination}\n\n"
                                 response += f"**Distance:** {directions['distance']}\n"
                                 response += f"**Duration:** {directions['duration']}\n\n"
                                 response += "**Steps:**\n"
@@ -215,25 +231,35 @@ def main():
     with st.sidebar:
         st.title("🗺️ AI Place Finder")
         
-        # Welcome section with collapsible instructions
-        with st.expander("ℹ️ How to use", expanded=False):
+        # Main welcome message
+        st.markdown("""
+        ### 🌟 Welcome to PlaceScout! 
+
+        Your AI-powered location assistant that helps you discover places and get directions using natural language. Simply type your request, and I'll handle the rest!
+        """)
+
+         # Pro tips
+        st.markdown("""
+        💡 **Quick Tips:**
+        1. Start with finding places you're interested in
+        2. Then ask for directions using the place names - walk, transit, or drive!
+        3. I'll remember locations and provide detailed info with photos!
+        """)
+       # Expandable examples section
+        with st.expander("🔍 See example prompts"):
             st.markdown("""
-            ### Welcome! 👋
-            I can help you:
-            
-            🔍 **Find Places**
-            - *"Find pizza places near Central Park"*
-            - *"Show me coffee shops in downtown"*
-            
-            🗺️ **Get Directions**
-            - *"How do I get to Times Square?"*
-            - *"Directions from A to B"*
-            
-            💡 **Tips:**
-            1. Search for places first
-            2. Then get directions using exact place names
+            **Finding Places:**
+            - *"Find gyms with good personal trainers close to my place at [my location]"*
+            - *"Show me highly rated and cheap sushi places in downtown, Vancouver"*
+            - *"Looking for dog-friendly parks near me"*
+
+            **Getting Directions:**
+            - *"How do I walk to the first sushi place?"*
+            - *"What's the fastest transit route to that gym?"*
+            - *"Drive directions to the park from my location"*
             """)
-           
+
+
         # Recent Places section
         st.markdown("### 📍 Recent Places")
         
